@@ -59,7 +59,7 @@ def clean_column_names(columns):
 def add_correctness_columns(df, answer_map):
     for column, correct_answer in answer_map.items():
         if column in df.columns:
-            df[column] = df[column].fillna(0)
+            df[column] = df[column].fillna("")
             # Create a new column with 1 if correct, 0 if incorrect
             df[f'{column}_correct'] = np.where(df[column].str.strip().str.lower() == correct_answer.lower(), 1, 0)
     return df
@@ -101,7 +101,10 @@ def utest(cond1, cond2):
 
 ```{python}
 study_name = "pg"
-file_list = glob.glob(os.path.join(os.getcwd(), "2025-10-19_SurveyData", study_name+"*.csv")) # <1>
+file_list = glob.glob(os.path.join(os.getcwd(), "data/2025-10-19_SurveyData", study_name+"*.csv")) # <1>
+
+for f in file_list:
+    print(os.path.basename(f))
 
 df_combined = pd.DataFrame({})
 condition_list = []

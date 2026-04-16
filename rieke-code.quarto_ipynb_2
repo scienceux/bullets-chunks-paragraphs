@@ -1,0 +1,1214 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "---\n",
+        "title: \"Slide design: chunks, bullets or paragraphs?\"\n",
+        "author: \"Mike and Rieke\"\n",
+        "toc: true\n",
+        "format: \n",
+        "  html:\n",
+        "    code-annotations: hover\n",
+        "    embed-resources: true\n",
+        "  pdf: default\n",
+        "date: today\n",
+        "---"
+      ],
+      "id": "408f1ce2"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| code-fold: true\n",
+        "#| code-summary: \"packages\"\n",
+        "\n",
+        "import os\n",
+        "import glob\n",
+        "import pandas as pd\n",
+        "import re\n",
+        "import random\n",
+        "import numpy as np\n",
+        "import scipy.stats as stats\n",
+        "import statsmodels.stats.multicomp as mc\n",
+        "from plotnine import * \n",
+        "from IPython.display import Markdown, display\n",
+        "from tabulate import tabulate"
+      ],
+      "id": "cbb7cc6b",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Functions"
+      ],
+      "id": "8ec9ddc6"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| code-fold: true\n",
+        "\n",
+        "# Function to read CSV and add condition column\n",
+        "def read_csv_with_condition(file_path):\n",
+        "    df = pd.read_csv(file_path, header=[0], skiprows = [1])\n",
+        "    condition_name = os.path.splitext(os.path.basename(file_path))[0].replace(study_name+\"-\", \"\")  # Get filename without extension and remove the study round\n",
+        "    df['condition'] = condition_name  # Add condition column\n",
+        "    df['conditionLength'] = int(condition_name.split('-')[0])\n",
+        "    df['conditionType'] = condition_name.split('-')[1]\n",
+        "    return df, condition_name\n",
+        "\n",
+        "# Function to combine headers\n",
+        "def combine_headers(df):\n",
+        "    df.columns = [' '.join(col).strip() for col in df.columns.values]\n",
+        "    return df\n",
+        "\n",
+        "# Clean remaining column names\n",
+        "def clean_column_names(columns):\n",
+        "    cleaned_columns = []\n",
+        "    for col in columns:\n",
+        "        col = re.sub(r'\\bresponse\\b', '', col, flags=re.IGNORECASE)\n",
+        "        col = re.sub(r'[^a-zA-Z0-9]', '_', col).lower()\n",
+        "        col = col.strip('_')\n",
+        "        cleaned_columns.append(col)\n",
+        "    return cleaned_columns\n",
+        "  \n",
+        "# Function to check answers and add correctness columns\n",
+        "def add_correctness_columns(df, answer_map):\n",
+        "    for column, correct_answer in answer_map.items():\n",
+        "        if column in df.columns:\n",
+        "            df[column] = df[column].fillna(\"\")\n",
+        "            # Create a new column with 1 if correct, 0 if incorrect\n",
+        "            df[f'{column}_correct'] = np.where(df[column].str.strip().str.lower() == correct_answer.lower(), 1, 0)\n",
+        "    return df\n",
+        "\n",
+        "# Function to add a total correct column for each participant\n",
+        "def add_total_correct_column(df):\n",
+        "    # Identify all correctness columns (columns ending with '_correct')\n",
+        "    correctness_columns = [col for col in df.columns if col.endswith('_correct')]\n",
+        "    # Sum the correctness columns to create the total correct column\n",
+        "    df['total_correct'] = df[correctness_columns].sum(axis=1)\n",
+        "    return df\n",
+        "  \n",
+        "# Function to merge the answers to a single question into one column\n",
+        "def merge_columnes(df, column_name, number_of_columns):\n",
+        "  #number_of_columns needs to be the total number, not just the ones that are to be merged\n",
+        "  loc_index = df.columns.get_loc(column_name)\n",
+        "  df[column_name] = df.iloc[:, loc_index:loc_index+number_of_columns].bfill(axis=1).iloc[:, 0]\n",
+        "  df.drop(df.columns[loc_index+1:loc_index+number_of_columns], axis=1, inplace=True)\n",
+        "  return df\n",
+        "\n",
+        "#function to calculate and print U-test\n",
+        "def utest(cond1, cond2):\n",
+        "  results = {}\n",
+        "\n",
+        "  for column in test_columns:\n",
+        "    df_combined_dropna = df_combined.dropna(subset = [column], inplace=False)\n",
+        "    U1, p = stats.mannwhitneyu(df_combined_dropna[column][df_combined_dropna['condition'] == cond1],\n",
+        "                df_combined_dropna[column][df_combined_dropna['condition'] == cond2], method=\"exact\")\n",
+        "    results[column] = {'U1_stat': U1, 'p_value': p}\n",
+        "  \n",
+        "  df = pd.DataFrame.from_dict(results, orient = \"index\")\n",
+        "  df.index = test_column_names\n",
+        "  Markdown(tabulate(df, headers = [\"U1 statistic\", \"p-value\"]))\n",
+        "\n",
+        "  display(Markdown(df.to_markdown()))"
+      ],
+      "id": "14f7b94c",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Load data"
+      ],
+      "id": "731bfdaa"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "study_name = \"pg\"\n",
+        "file_list = glob.glob(os.path.join(os.getcwd(), \"data/2025-10-19_SurveyData\", study_name+\"*.csv\")) # <1>\n",
+        "\n",
+        "for f in file_list:\n",
+        "    print(os.path.basename(f))\n",
+        "\n",
+        "df_combined = pd.DataFrame({})\n",
+        "condition_list = []\n",
+        "\n",
+        "for i in range(len(file_list)):\n",
+        "  new_file, conditionname = read_csv_with_condition(file_list[i]) # <2>\n",
+        "  df_combined = pd.concat([df_combined, new_file], ignore_index = True) # <3>\n",
+        "  condition_list.append(conditionname) # <4>\n",
+        "\n",
+        "df_combined = df_combined.convert_dtypes() # <5>"
+      ],
+      "id": "534a1c82",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "1. Get list of all files for this study round.\n",
+        "2. Read the files.\n",
+        "3. Create dataframe with all the data.\n",
+        "4. Create a list of all studied conditions\n",
+        "5. To make processing easier, we convert the data types for the whole data frame right away.\n",
+        "\n",
+        "# Clean data\n",
+        "\n",
+        "Rename columns to make processing easier"
+      ],
+      "id": "1e551af7"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "rename_map = {\n",
+        "    'Please rate these slides I found the slides to be attractive.': \n",
+        "      'slides_attractive',\n",
+        "    'In what year did the Tasmanian Tiger go extinct?': \n",
+        "      'tiger_extinct_year',\n",
+        "    'What kind of animal would the Tasmanian Tiger be classified as?': \n",
+        "      'tiger_classified',\n",
+        "    \"What were the primary causes of the Tasmanian Tiger's extinction?\": \n",
+        "      'tiger_extinct_why',\n",
+        "    'Why are exoplanets important to the search for life beyond Earth?': \n",
+        "      'why_exoplanets_important',\n",
+        "    'Why do scientists prioritize Earth-like planets in their search for life?': \n",
+        "      'why_prioritize_earthlike_planets',\n",
+        "    'Exoplanets were discovered in which year?': \n",
+        "      'exoplanets_discovered_year',\n",
+        "    'What do AI automation and chatbots primarily help reduce in customer service?': \n",
+        "      'what_chatbots_reduce',\n",
+        "    'What role do CRM systems play in customer service?': \n",
+        "      'what_role_crms_play',\n",
+        "    'What is the relationship between 24/7 support and overall efficiency in customer service?': \n",
+        "      'relationship_24_7_efficiency',\n",
+        "    'Please rate these slides': \n",
+        "      'slides_attractive',\n",
+        "    'Unnamed: 19': \n",
+        "      'slides_clean_simple',\n",
+        "    'In reviewing the slides, I invested:': \n",
+        "      'cognitive_load',\n",
+        "    'What is the highest level of education you have completed?  ': \n",
+        "      'highest_education',\n",
+        "    'How often do you create presentations with slides (for yourself or others)?': \n",
+        "      'creation_frequency',\n",
+        "    \"Enter your email. This is just to make sure we only count you once. We won't spam you.\": 'email'\n",
+        "}\n",
+        "df_combined.rename(columns=rename_map, inplace=True)\n",
+        "\n",
+        "df_combined.columns = clean_column_names(df_combined.columns)"
+      ],
+      "id": "1f39e882",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Remove empty columns"
+      ],
+      "id": "2ea85d2b"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "blank_columns = [col for col in df_combined.columns if df_combined[col].isna().all()]\n",
+        "df_combined.drop(columns=blank_columns, inplace=True)"
+      ],
+      "id": "1271bbd6",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Remove duplicates"
+      ],
+      "id": "e2c9652e"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#https://stackoverflow.com/questions/23512339/drop-duplicates-while-preserving-nans-in-pandas\n",
+        "df_combined = df_combined[(~df_combined.duplicated()) ]"
+      ],
+      "id": "2054e43f",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Evaluate correctness of answers\n",
+        "\n",
+        "Dictionary with correct answers"
+      ],
+      "id": "a2b7a5fc"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "correct_answers = {\n",
+        "    'tiger_extinct_year': '1936',\n",
+        "    'tiger_classified': 'Marsupial',\n",
+        "    'tiger_extinct_why': 'Hunting and habitat loss',\n",
+        "    'why_exoplanets_important': \n",
+        "      'They may be habitable and contain liquid water, and biosignatures.',\n",
+        "    'why_prioritize_earthlike_planets': \n",
+        "      'They might have liquid water and biosignatures.',\n",
+        "    'exoplanets_discovered_year': '1992',\n",
+        "    'what_chatbots_reduce': 'Wait times',\n",
+        "    'what_role_crms_play': 'They personalize experiences.',\n",
+        "    'relationship_24_7_efficiency': '24/7 support boosts efficiency.'\n",
+        "}"
+      ],
+      "id": "f101ac8a",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Check the answers and calculate total correct answers per participant"
+      ],
+      "id": "b36ca455"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "df_combined['tiger_extinct_year'] = df_combined['tiger_extinct_year'].astype(str) # <1>\n",
+        "df_combined['exoplanets_discovered_year'] = df_combined['exoplanets_discovered_year'].astype(str) # <1>\n",
+        "\n",
+        "df_combined = add_correctness_columns(df_combined, correct_answers) # <2>\n",
+        "df_combined = add_total_correct_column(df_combined) # <3>"
+      ],
+      "id": "ee706a54",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "1. only works with strings not integers\n",
+        "2. determine whether the answer to each individual question was correct\n",
+        "3. determine how many correct answers everyone gave\n",
+        "\n",
+        "# Plots\n",
+        "\n",
+        "::: {.callout-tip}\n",
+        "These are bar graphs for each condition. The three columns correspond to the three text types, the three rows to the three text lengths. For how to read a bar graph, see for example [here](https://www.dummies.com/article/academics-the-arts/math/statistics/how-to-interpret-a-statistical-bar-graph-169760/).\n",
+        ":::\n",
+        "\n",
+        "## Total of correct answers"
+      ],
+      "id": "a0d5c06e"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "p = (\n",
+        "  ggplot(df_combined, aes(x = \"total_correct\")) \n",
+        "  + geom_histogram(binwidth = 1, fill = \"grey\", color = \"black\")\n",
+        "  + facet_grid('conditionlength~conditiontype')\n",
+        "  + theme_light() \n",
+        "  + labs(x = \"Number of correct answers\", y = \"Number of each answer\")\n",
+        ")\n",
+        "\n",
+        "p.show()"
+      ],
+      "id": "cf101a81",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Total slide attractiveness rating"
+      ],
+      "id": "f4f7a32d"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "df_combined[\"slides_attractive\"] = df_combined[\"slides_attractive\"].astype(str)\n",
+        "\n",
+        "p = (\n",
+        "  ggplot(df_combined, aes(x = \"slides_attractive\")) \n",
+        "  + geom_histogram(binwidth = 1, fill = \"grey\", color = \"black\")\n",
+        "  + scale_x_discrete(limits=[\"Strongly disagree\", \"Disagree\", \n",
+        "  \"Neither agree nor disagree\", \"Agree\", \"Strongly agree\"],\n",
+        "  labels = [\"disagree\", \"\", \"\", \"\", \"agree\"])\n",
+        "  + facet_grid('conditionlength~conditiontype')\n",
+        "  + theme_light()\n",
+        "  + labs(x = \"Slides attractiveness rating\", y = \"Number of each answer\")\n",
+        ")\n",
+        "\n",
+        "p.show()"
+      ],
+      "id": "6a99ef13",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Total slide cleanliness rating"
+      ],
+      "id": "f359cc7e"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "df_combined[\"slides_clean_simple\"] = df_combined[\"slides_clean_simple\"].astype(str)\n",
+        "\n",
+        "p = (\n",
+        "  ggplot(df_combined, aes(x = \"slides_clean_simple\")) \n",
+        "  + geom_histogram(binwidth = 1, fill = \"grey\", color = \"black\")\n",
+        "  + scale_x_discrete(limits=[\"Strongly disagree\", \"Disagree\", \n",
+        "  \"Neither agree nor disagree\", \"Agree\", \"Strongly agree\"], \n",
+        "  labels = [\"disagree\", \"\", \"\", \"\", \"agree\"])\n",
+        "  + facet_grid('conditionlength~conditiontype')\n",
+        "  + theme_light()\n",
+        "  + labs(x = \"Slides simplicity rating\", y = \"Number of each answer\")\n",
+        ")\n",
+        "\n",
+        "p.show()"
+      ],
+      "id": "e42047b4",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Total cognitive load rating\n",
+        "\n",
+        "::: {.callout-caution}\n",
+        "Note that I swaped the x-axis to make it correspond to the previous plots (more right = better) \n",
+        ":::"
+      ],
+      "id": "f4b0a59e"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "p = (\n",
+        "  ggplot(df_combined, aes(x = \"cognitive_load\")) \n",
+        "  + geom_histogram(binwidth = 1, fill = \"grey\", color = \"black\")\n",
+        "  + scale_x_discrete(limits = [\n",
+        "  \"very high mental effort\",\n",
+        "  \"high mental effort\",  \n",
+        "  \"neither low nor high mental effort\", \n",
+        "  \"low mental effort\", \n",
+        "  \"very low mental effort\"], \n",
+        "  labels = [\"high\", \"\", \"middle\", \"\", \"low\"])\n",
+        "  + facet_grid('conditionlength~conditiontype')\n",
+        "  + theme_light()\n",
+        "  + labs(x = \"Cognitive load rating\", y = \"Number of each answer\")\n",
+        ")\n",
+        "\n",
+        "p.show()"
+      ],
+      "id": "81d39069",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## How many for which question correct?\n",
+        "(not corrected for missing answers!)"
+      ],
+      "id": "1019be1e"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "only_correct_counts = df_combined.loc[:, df_combined.columns.str.endswith('correct') & ~df_combined.columns.str.startswith('total')]\n",
+        "print(only_correct_counts.sum()/len(only_correct_counts))"
+      ],
+      "id": "23751c6c",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Order of questions\n",
+        "1. Tasmanian tiger\n",
+        "2. Exoplanets\n",
+        "3. AI chatbots\n",
+        "\n",
+        "\n",
+        "# Convert categorical data to numbers\n",
+        "\n",
+        "For the statistical evaluation, the category based answers need to be converted to numbers."
+      ],
+      "id": "34e5033a"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "cognitive_load_scale = {\n",
+        "  \"very high mental effort\": 2,\n",
+        "  \"high mental effort\": 1,  \n",
+        "  \"neither low nor high mental effort\": 0, \n",
+        "  \"low mental effort\": -1, \n",
+        "  \"very low mental effort\": -2}\n",
+        "\n",
+        "slides_scale = {\"Strongly disagree\": -2, \"Disagree\": -1, \n",
+        "  \"Neither agree nor disagree\": 0, \"Agree\": 1, \"Strongly agree\": 2}\n",
+        "  \n",
+        "df_combined['cognitive_load_cat'] = df_combined['cognitive_load'].map(cognitive_load_scale)\n",
+        "\n",
+        "df_combined['slides_attractive_cat'] = df_combined['slides_attractive'].map(slides_scale)\n",
+        "df_combined['slides_clean_simple_cat'] = df_combined['slides_clean_simple'].map(slides_scale)"
+      ],
+      "id": "85d812fc",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "# Statistics"
+      ],
+      "id": "e3947c64"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "test_columns = ['total_correct', \n",
+        "  'cognitive_load_cat', \n",
+        "  'slides_attractive_cat', \n",
+        "  'slides_clean_simple_cat']\n",
+        "test_column_names = ['Correct answers', \n",
+        "  'Cognitive Load', \n",
+        "  'Slide Attractiveness', \n",
+        "  'Slide Simplicity']"
+      ],
+      "id": "5b6c081a",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## sample sizes\n",
+        "Number of answers for each question and condition combination"
+      ],
+      "id": "5e644c60"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "\n",
+        "Markdown(tabulate(\n",
+        "  df_combined[test_columns+['condition']].groupby(['condition']).count(),\n",
+        "  headers = test_column_names))"
+      ],
+      "id": "38e69672",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## normal distribution\n",
+        "\n",
+        "This is necessary to decide which test is adequate to test for a difference between means.\n",
+        "\n",
+        "::: {.callout-note}\n",
+        "now Shapiro-Wilk-test (for sample size <50), with larger sample size (>40) use chi-squared test or maybe also Kolmogorov–Smirnov-test\n",
+        ":::\n",
+        "\n",
+        "::: {.callout-tip}\n",
+        "non significant means normally distributed (or rather can't reject the null hypothesis)\n",
+        ":::"
+      ],
+      "id": "5de0f07c"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "results = {}\n",
+        "\n",
+        "for column in test_columns:\n",
+        "  new_dict = {}\n",
+        "  for condition in condition_list:\n",
+        "    df_combined_dropna = df_combined.dropna(subset = [column], inplace = False)\n",
+        "    S_result, p_value = stats.shapiro(df_combined_dropna[column][df_combined_dropna['condition'] == condition])\n",
+        "    new_dict[condition] = {'S_result': S_result, 'p_value': p_value}\n",
+        "  results[column] = new_dict"
+      ],
+      "id": "9f4260f7",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "#| output: asis\n",
+        "\n",
+        "i = 0\n",
+        "for column, result in results.items():\n",
+        "  print(\"### \", test_column_names[i])\n",
+        "  print(\" \")\n",
+        "  df = pd.DataFrame.from_dict(result, orient = \"index\")\n",
+        "  df = df.rename(columns={\"S_result\": \"Shapiro result statistic\", \"p_value\": \"p-value\"})\n",
+        "  display(Markdown(df.to_markdown()))\n",
+        "  print(\" \")\n",
+        "  print(\" \")\n",
+        "  i = i + 1"
+      ],
+      "id": "2d142453",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Result: most are not normally distributed (null hypothesis rejected within alpha 0.05)\n",
+        "\n",
+        "## Mann-Whitney U-test\n",
+        "\n",
+        "they are not normally distributed, hence we use the U-test to test for difference between means\n",
+        "(variances and size of sample do not matter)\n",
+        "\n",
+        "::: {.callout-tip}\n",
+        "non significant means normally distributed (or rather can't reject the null hypothesis)\n",
+        ":::\n",
+        "\n",
+        "::: {.callout-tip}\n",
+        "\n",
+        "You want to look for the cases, where the p value is below 0.05. This means there is a significant difference between the two conditions.\n",
+        ":::\n",
+        "\n",
+        "\n",
+        "### Hypothesis 1: Chunks are most attractive\n",
+        "\n",
+        "::: {.callout-important}\n",
+        "(not really a best practice to use the same dataset to develop hypothesis and test it)\n",
+        ":::\n",
+        "\n",
+        "#### 30-chunks vs. 30-bullets"
+      ],
+      "id": "c0c77197"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('30-chunks', '30-bullets')"
+      ],
+      "id": "bc39712f",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "#### 30-chunks vs. 30-para"
+      ],
+      "id": "0d0e00ea"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('30-chunks', '30-para')"
+      ],
+      "id": "c76a1a85",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "#### 50-chunks vs. 50-bullets"
+      ],
+      "id": "b408d3fe"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('50-chunks', '50-bullets')"
+      ],
+      "id": "039cdf0e",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "#### 50-chunks vs. 50-para"
+      ],
+      "id": "b9f71a7f"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('50-chunks', '50-para')"
+      ],
+      "id": "2f21fe96",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "#### 100-chunks vs. 100-bullets"
+      ],
+      "id": "f58747ca"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('100-chunks', '100-bullets')"
+      ],
+      "id": "ebf998d5",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "#### 100-chunks vs. 100-para"
+      ],
+      "id": "cc022f11"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('100-chunks', '100-para')"
+      ],
+      "id": "88f18e35",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "### Hypothesis 2: Bullets worse the longer\n",
+        "\n",
+        "#### 30-bullets vs. 50-bullets"
+      ],
+      "id": "119d4ea4"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('30-bullets', '50-bullets')"
+      ],
+      "id": "2af831d0",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "#### 30-bullets vs. 100-bullets"
+      ],
+      "id": "a1fb6d17"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('30-bullets', '100-bullets')"
+      ],
+      "id": "261295a1",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "#### 50-bullets vs. 100-bullets"
+      ],
+      "id": "c1ed082b"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('50-bullets', '100-bullets')"
+      ],
+      "id": "a061d1f0",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "### Hypothesis 3: Long chunks don't work\n",
+        "\n",
+        "see Hypothesis 1\n",
+        "\n",
+        "### other stuff\n",
+        "\n",
+        "comparing the most extreme conditions\n",
+        "\n",
+        "#### 30-chunks vs. 100-bullets"
+      ],
+      "id": "24bf7e38"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('30-chunks', '100-bullets')"
+      ],
+      "id": "321baf53",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "#### 30-bullets vs. 100-bullets"
+      ],
+      "id": "7c1d1e72"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| echo: false\n",
+        "utest('30-bullets', '100-bullets')"
+      ],
+      "id": "b5543057",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "## Explorations\n",
+        "\n",
+        "::: {.callout-tip}\n",
+        "There are violin plots with an overlay box plot in this section. See for example [here](https://mode.com/blog/violin-plot-examples#how-to-read-violin-plot) for an explanation how to read it. In the other plots (beeswarm plots) each point corresponds to one answer. They are slightly offset in x-direction to make it easier to see.\n",
+        ":::\n",
+        "\n",
+        "### Correlation between cognitive load and correct answers?"
+      ],
+      "id": "9a419112"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "p = (\n",
+        "  ggplot(df_combined, aes(x = \"cognitive_load\", y = \"total_correct\")) \n",
+        "  + geom_jitter(width=0.2, height = 0)\n",
+        "  + scale_x_discrete(limits = [\n",
+        "  \"very high mental effort\",\n",
+        "  \"high mental effort\",  \n",
+        "  \"neither low nor high mental effort\", \n",
+        "  \"low mental effort\", \n",
+        "  \"very low mental effort\"], \n",
+        "  labels = [\"high\", \"\", \"middle\", \"\", \"low\"])\n",
+        "  + facet_grid('conditionlength~conditiontype')\n",
+        "  + theme_light()\n",
+        "  + labs(x = \"Cognitive load rating\", y = \"Number of correct answers\")\n",
+        ")\n",
+        "\n",
+        "p.show()"
+      ],
+      "id": "49843373",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "p = (\n",
+        "  ggplot(df_combined, aes(x = \"cognitive_load\", y = \"total_correct\")) \n",
+        "  + geom_violin()\n",
+        "  + geom_boxplot(width=0.2)\n",
+        "  + scale_x_discrete(limits = [\n",
+        "  \"very high mental effort\",\n",
+        "  \"high mental effort\",  \n",
+        "  \"neither low nor high mental effort\", \n",
+        "  \"low mental effort\", \n",
+        "  \"very low mental effort\"], \n",
+        "  labels = [\"high\", \"\", \"middle\", \"\", \"low\"])\n",
+        "  #+ facet_grid('conditionlength~conditiontype')\n",
+        "  + theme_light()\n",
+        "  + labs(x = \"Cognitive load rating\", y = \"Number of correct answers\")\n",
+        ")\n",
+        "\n",
+        "p.show()"
+      ],
+      "id": "f41a58b5",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "### Correlation between slide simplicity and correct answers?"
+      ],
+      "id": "3b603c79"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "p = (\n",
+        "  ggplot(df_combined, aes(x = \"slides_clean_simple\", y = \"total_correct\")) \n",
+        "  + geom_jitter(width=0.2, height = 0)\n",
+        "  + scale_x_discrete(limits=[\"Strongly disagree\", \"Disagree\", \n",
+        "  \"Neither agree nor disagree\", \"Agree\", \"Strongly agree\"], \n",
+        "  labels = [\"disagree\", \"\", \"\", \"\", \"agree\"])\n",
+        "  + facet_grid('conditionlength~conditiontype')\n",
+        "  + theme_light()\n",
+        "  + labs(x = \"Slides clean and simple?\", y = \"Number of correct answers\")\n",
+        ")\n",
+        "\n",
+        "p.show()"
+      ],
+      "id": "e2e8b527",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "p = (\n",
+        "  ggplot(df_combined, aes(x = \"slides_clean_simple\", y = \"total_correct\")) \n",
+        "  + geom_violin()\n",
+        "  + geom_boxplot(width=0.2)\n",
+        "  + scale_x_discrete(limits=[\"Strongly disagree\", \"Disagree\", \n",
+        "  \"Neither agree nor disagree\", \"Agree\", \"Strongly agree\"], \n",
+        "  labels = [\"disagree\", \"\", \"\", \"\", \"agree\"])\n",
+        "  #+ facet_grid('conditionlength~conditiontype')\n",
+        "  + theme_light()\n",
+        "  + labs(x = \"Slides clean and simple?\", y = \"Number of correct answers\")\n",
+        ")\n",
+        "\n",
+        "p.show()"
+      ],
+      "id": "0f69f428",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "### Correlation between slide attractiveness and correct answers?"
+      ],
+      "id": "9f7036fc"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "p = (\n",
+        "  ggplot(df_combined, aes(x = \"slides_attractive\", y = \"total_correct\")) \n",
+        "  + geom_jitter(width=0.2, height = 0)\n",
+        "  + scale_x_discrete(limits=[\"Strongly disagree\", \"Disagree\", \n",
+        "  \"Neither agree nor disagree\", \"Agree\", \"Strongly agree\"], \n",
+        "  labels = [\"disagree\", \"\", \"\", \"\", \"agree\"])\n",
+        "  + facet_grid('conditionlength~conditiontype')\n",
+        "  + theme_light()\n",
+        "  + labs(x = \"Slides attractive?\", y = \"Number of correct answers\")\n",
+        ")\n",
+        "\n",
+        "p.show()"
+      ],
+      "id": "8f44f76a",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "p = (\n",
+        "  ggplot(df_combined, aes(x = \"slides_attractive\", y = \"total_correct\")) \n",
+        "  + geom_violin()\n",
+        "  + geom_boxplot(width=0.2)\n",
+        "  + scale_x_discrete(limits=[\"Strongly disagree\", \"Disagree\", \n",
+        "  \"Neither agree nor disagree\", \"Agree\", \"Strongly agree\"], \n",
+        "  labels = [\"disagree\", \"\", \"\", \"\", \"agree\"])\n",
+        "  #+ facet_grid('conditionlength~conditiontype')\n",
+        "  + theme_light()\n",
+        "  + labs(x = \"Slides attractive?\", y = \"Number of correct answers\")\n",
+        ")\n",
+        "\n",
+        "p.show()"
+      ],
+      "id": "24a2bd7a",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "### Who stopped answering when?\n",
+        "\n",
+        "Number of people starting in each condition"
+      ],
+      "id": "18cf8647"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "df_combined.groupby(['condition']).count().max(axis = 1)"
+      ],
+      "id": "df4d144a",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "Number of people who answered each question per condition"
+      ],
+      "id": "4e8818e2"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "question_columns = [    \n",
+        "  'tiger_extinct_year',\n",
+        "  # 'tiger_classified',\n",
+        "  # 'tiger_extinct_why',\n",
+        "  'why_exoplanets_important',\n",
+        "  # 'why_prioritize_earthlike_planets',\n",
+        "  # 'exoplanets_discovered_year',\n",
+        "  'what_chatbots_reduce'#,\n",
+        "  # 'what_role_crms_play',\n",
+        "  # 'relationship_24_7_efficiency'\n",
+        "  ]\n",
+        "\n",
+        "df_combined.groupby(['condition']).agg(lambda x: x[((x != 0) & (x != \"<NA>\"))].count())[question_columns]"
+      ],
+      "id": "7f7fe006",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "As the answer numbers per question theme is the same, I chose just one question in each theme to count the answers.\n",
+        "\n",
+        "There doesn't seem to emerge a clear pattern (except maybe for the paragraphs where in each condition the same number of people dropped out after each question, but with that sample size that might just be chance).\n",
+        "\n",
+        "### Number of correct answers to first questions?\n",
+        "\n",
+        "This is the number of correct answers for the first theme (total number, not relative amount to the people that actually answered -- check the table above for an idea how many people answered)."
+      ],
+      "id": "af9b3d8f"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "df_combined[['condition', 'tiger_classified_correct', 'tiger_extinct_year_correct', 'tiger_extinct_why_correct']].groupby(['condition']).sum()"
+      ],
+      "id": "919aa4d3",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "In contrast, the number of correct answers for the following themes:"
+      ],
+      "id": "3836ffbf"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "df_combined[['condition',   'why_exoplanets_important_correct',\n",
+        "  'why_prioritize_earthlike_planets_correct',\n",
+        "  'exoplanets_discovered_year_correct']].groupby(['condition']).sum()"
+      ],
+      "id": "d18f13b0",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {
+        "message": false
+      },
+      "source": [
+        "#| echo: false\n",
+        "#| warning: false\n",
+        "\n",
+        "df_combined[['condition',\n",
+        "  'what_chatbots_reduce_correct',\n",
+        "  'what_role_crms_play_correct',\n",
+        "  'relationship_24_7_efficiency_correct']].groupby(['condition']).sum()"
+      ],
+      "id": "9d4147cc",
+      "execution_count": null,
+      "outputs": []
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "name": "python312",
+      "language": "python",
+      "display_name": "Python 3.12 (ipykernel)",
+      "path": "C:\\Users\\User\\AppData\\Roaming\\jupyter\\kernels\\python312"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
