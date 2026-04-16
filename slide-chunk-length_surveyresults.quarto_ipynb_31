@@ -16,7 +16,7 @@
         "date: today\n",
         "---"
       ],
-      "id": "c1613f2d"
+      "id": "99fa9006"
     },
     {
       "cell_type": "code",
@@ -37,7 +37,7 @@
         "from IPython.display import Markdown, display\n",
         "from tabulate import tabulate"
       ],
-      "id": "e442ca42",
+      "id": "4efdc86a",
       "execution_count": null,
       "outputs": []
     },
@@ -47,7 +47,7 @@
       "source": [
         "# Functions"
       ],
-      "id": "303a5d49"
+      "id": "b9e11d2c"
     },
     {
       "cell_type": "code",
@@ -57,75 +57,9 @@
         "\n",
         "# Function to read CSV and add condition column\n",
         "def read_csv_with_condition(file_path):\n",
-        "    raw = pd.read_csv(file_path, header=None, nrows=2)\n",
-        "    row0 = raw.iloc[0].tolist()\n",
-        "    row1 = raw.iloc[1].tolist()\n",
-        "\n",
-        "    df = pd.read_csv(file_path, header=[0], skiprows=[1])\n",
-        "\n",
-        "    # Detect new SurveyMonkey export format (one column per answer option).\n",
-        "    # Old format: sub-headers say 'Response'. New format: sub-headers contain option text.\n",
-        "    is_new_format = (pd.notna(row1[9]) and\n",
-        "                     str(row1[9]).strip() not in ('Response', 'Open-Ended Response'))\n",
-        "\n",
-        "    if is_new_format:\n",
-        "        col_names = list(df.columns)\n",
-        "\n",
-        "        # Build groups: named column position -> list of following unnamed positions\n",
-        "        groups = {}\n",
-        "        current = None\n",
-        "        for i, h in enumerate(row0):\n",
-        "            if pd.notna(h):\n",
-        "                current = i\n",
-        "                groups[i] = []\n",
-        "            elif current is not None:\n",
-        "                groups[current].append(i)\n",
-        "\n",
-        "        cols_to_drop = []\n",
-        "        cols_to_add = {}  # new column name -> merged series\n",
-        "\n",
-        "        for named_idx, unnamed_idxes in sorted(groups.items()):\n",
-        "            if not unnamed_idxes:\n",
-        "                continue\n",
-        "\n",
-        "            all_idxes = [named_idx] + unnamed_idxes\n",
-        "            all_names = [col_names[i] for i in all_idxes]\n",
-        "            subqs = [str(row1[i]) if pd.notna(row1[i]) else '' for i in all_idxes]\n",
-        "\n",
-        "            if ' - ' in subqs[0]:\n",
-        "                # Rating/matrix: multiple sub-questions each with multiple options.\n",
-        "                # Group columns by sub-question prefix (text before ' - ').\n",
-        "                by_prefix = {}\n",
-        "                for idx, sq in zip(all_idxes, subqs):\n",
-        "                    prefix = sq.split(' - ')[0]\n",
-        "                    by_prefix.setdefault(prefix, []).append(idx)\n",
-        "\n",
-        "                prefixes = list(by_prefix.keys())\n",
-        "\n",
-        "                # First sub-question: merge options into the named column\n",
-        "                first_names = [col_names[i] for i in by_prefix[prefixes[0]]]\n",
-        "                df[first_names[0]] = df[first_names].bfill(axis=1).iloc[:, 0]\n",
-        "                cols_to_drop.extend(first_names[1:])\n",
-        "\n",
-        "                # Additional sub-questions: collect under 'Unnamed: 19' for\n",
-        "                # backward compatibility with rename_map -> slides_clean_simple\n",
-        "                extra_keys = ['Unnamed: 19']\n",
-        "                for k, prefix in enumerate(prefixes[1:]):\n",
-        "                    sub_names = [col_names[i] for i in by_prefix[prefix]]\n",
-        "                    new_name = extra_keys[k] if k < len(extra_keys) else f'_subq_{k + 1}'\n",
-        "                    cols_to_add[new_name] = df[sub_names].bfill(axis=1).iloc[:, 0]\n",
-        "                    cols_to_drop.extend(sub_names)\n",
-        "            else:\n",
-        "                # Single-answer MCQ: merge all option columns into the named column\n",
-        "                df[all_names[0]] = df[all_names].bfill(axis=1).iloc[:, 0]\n",
-        "                cols_to_drop.extend(all_names[1:])\n",
-        "\n",
-        "        df.drop(columns=[c for c in cols_to_drop if c in df.columns], inplace=True)\n",
-        "        for new_name, series in cols_to_add.items():\n",
-        "            df[new_name] = series\n",
-        "\n",
-        "    condition_name = os.path.splitext(os.path.basename(file_path))[0].replace(study_name+\"-\", \"\").replace(\"-\"+study_name, \"\")\n",
-        "    df['condition'] = condition_name\n",
+        "    df = pd.read_csv(file_path, header=[0], skiprows = [1])\n",
+        "    condition_name = os.path.splitext(os.path.basename(file_path))[0].replace(study_name+\"-\", \"\")  # Get filename without extension and remove the study round\n",
+        "    df['condition'] = condition_name  # Add condition column\n",
         "    df['conditionLength'] = int(condition_name.split('-')[0])\n",
         "    df['conditionType'] = condition_name.split('-')[1]\n",
         "    return df, condition_name\n",
@@ -149,7 +83,7 @@
         "def add_correctness_columns(df, answer_map):\n",
         "    for column, correct_answer in answer_map.items():\n",
         "        if column in df.columns:\n",
-        "            df[column] = df[column].fillna(\"\")\n",
+        "            df[column] = df[column].fillna(0)\n",
         "            # Create a new column with 1 if correct, 0 if incorrect\n",
         "            df[f'{column}_correct'] = np.where(df[column].str.strip().str.lower() == correct_answer.lower(), 1, 0)\n",
         "    return df\n",
@@ -186,7 +120,7 @@
         "\n",
         "  display(Markdown(df.to_markdown()))"
       ],
-      "id": "bf87899a",
+      "id": "707bb5e3",
       "execution_count": null,
       "outputs": []
     },
@@ -196,22 +130,14 @@
       "source": [
         "# Load data"
       ],
-      "id": "0564f209"
+      "id": "45815d78"
     },
     {
       "cell_type": "code",
       "metadata": {},
       "source": [
         "study_name = \"pg\"\n",
-        "data_dir = os.path.join(os.getcwd(), \"data/2026-April-14-SurveyData\")\n",
-        "file_list = glob.glob(os.path.join(data_dir, study_name+\"-*.csv\")) # <1>\n",
-        "\n",
-        "for f in file_list:\n",
-        "    print(os.path.basename(f))\n",
-        "\n",
-        "# Check that file exists\n",
-        "if not file_list:\n",
-        "    raise FileNotFoundError(f\"No files found for study round '{study_name}' in directory '{data_dir}'.\")\n",
+        "file_list = glob.glob(os.path.join(os.getcwd(), \"2025-10-19_SurveyData\", study_name+\"*.csv\")) # <1>\n",
         "\n",
         "df_combined = pd.DataFrame({})\n",
         "condition_list = []\n",
@@ -223,7 +149,7 @@
         "\n",
         "df_combined = df_combined.convert_dtypes() # <5>"
       ],
-      "id": "4e7b208f",
+      "id": "bc35a56f",
       "execution_count": null,
       "outputs": []
     },
@@ -237,13 +163,11 @@
         "4. Create a list of all studied conditions\n",
         "5. To make processing easier, we convert the data types for the whole data frame right away.\n",
         "\n",
-        "\n",
-        "\n",
         "# Clean data\n",
         "\n",
         "Rename columns to make processing easier"
       ],
-      "id": "0c07533e"
+      "id": "a1e0fb9f"
     },
     {
       "cell_type": "code",
@@ -286,7 +210,7 @@
         "\n",
         "df_combined.columns = clean_column_names(df_combined.columns)"
       ],
-      "id": "28ea34b2",
+      "id": "e09914b9",
       "execution_count": null,
       "outputs": []
     },
@@ -296,7 +220,7 @@
       "source": [
         "Remove empty columns"
       ],
-      "id": "d6418c60"
+      "id": "61583fe8"
     },
     {
       "cell_type": "code",
@@ -305,7 +229,7 @@
         "blank_columns = [col for col in df_combined.columns if df_combined[col].isna().all()]\n",
         "df_combined.drop(columns=blank_columns, inplace=True)"
       ],
-      "id": "1a5ca231",
+      "id": "e9e1edd5",
       "execution_count": null,
       "outputs": []
     },
@@ -315,7 +239,7 @@
       "source": [
         "Remove duplicates"
       ],
-      "id": "b3aee2fa"
+      "id": "513db0b1"
     },
     {
       "cell_type": "code",
@@ -324,7 +248,7 @@
         "#https://stackoverflow.com/questions/23512339/drop-duplicates-while-preserving-nans-in-pandas\n",
         "df_combined = df_combined[(~df_combined.duplicated()) ]"
       ],
-      "id": "a3c1bb50",
+      "id": "27ebf704",
       "execution_count": null,
       "outputs": []
     },
@@ -336,7 +260,7 @@
         "\n",
         "Dictionary with correct answers"
       ],
-      "id": "c652c1df"
+      "id": "037254ce"
     },
     {
       "cell_type": "code",
@@ -356,7 +280,7 @@
         "    'relationship_24_7_efficiency': '24/7 support boosts efficiency.'\n",
         "}"
       ],
-      "id": "4096734a",
+      "id": "ec8498d6",
       "execution_count": null,
       "outputs": []
     },
@@ -366,7 +290,7 @@
       "source": [
         "Check the answers and calculate total correct answers per participant"
       ],
-      "id": "edd1bbf9"
+      "id": "8b3dcdb8"
     },
     {
       "cell_type": "code",
@@ -378,7 +302,7 @@
         "df_combined = add_correctness_columns(df_combined, correct_answers) # <2>\n",
         "df_combined = add_total_correct_column(df_combined) # <3>"
       ],
-      "id": "0a898013",
+      "id": "64d82a65",
       "execution_count": null,
       "outputs": []
     },
@@ -398,7 +322,7 @@
         "\n",
         "## Total of correct answers"
       ],
-      "id": "e18dd6d8"
+      "id": "b586c809"
     },
     {
       "cell_type": "code",
@@ -409,12 +333,9 @@
         "#| echo: false\n",
         "#| warning: false\n",
         "\n",
-        "means_correct = df_combined.groupby(['conditionlength', 'conditiontype'])['total_correct'].mean().reset_index()\n",
-        "\n",
         "p = (\n",
         "  ggplot(df_combined, aes(x = \"total_correct\")) \n",
         "  + geom_histogram(binwidth = 1, fill = \"grey\", color = \"black\")\n",
-        "  + geom_vline(means_correct, aes(xintercept = \"total_correct\"), color = \"red\")\n",
         "  + facet_grid('conditionlength~conditiontype')\n",
         "  + theme_light() \n",
         "  + labs(x = \"Number of correct answers\", y = \"Number of each answer\")\n",
@@ -422,7 +343,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "4cc2550c",
+      "id": "5c49954c",
       "execution_count": null,
       "outputs": []
     },
@@ -432,7 +353,7 @@
       "source": [
         "## Total slide attractiveness rating"
       ],
-      "id": "911df8d0"
+      "id": "3850fa57"
     },
     {
       "cell_type": "code",
@@ -444,15 +365,10 @@
         "#| warning: false\n",
         "\n",
         "df_combined[\"slides_attractive\"] = df_combined[\"slides_attractive\"].astype(str)\n",
-        "slides_scale = {\"Strongly disagree\": -2, \"Disagree\": -1, \n",
-        "  \"Neither agree nor disagree\": 0, \"Agree\": 1, \"Strongly agree\": 2}\n",
-        "df_combined['slides_attractive_cat'] = df_combined['slides_attractive'].map(slides_scale)\n",
-        "means_attractive = df_combined.groupby(['conditionlength', 'conditiontype'])['slides_attractive_cat'].mean().reset_index()\n",
         "\n",
         "p = (\n",
         "  ggplot(df_combined, aes(x = \"slides_attractive\")) \n",
         "  + geom_histogram(binwidth = 1, fill = \"grey\", color = \"black\")\n",
-        "  + geom_vline(means_attractive, aes(xintercept = \"slides_attractive_cat\"), color = \"red\")\n",
         "  + scale_x_discrete(limits=[\"Strongly disagree\", \"Disagree\", \n",
         "  \"Neither agree nor disagree\", \"Agree\", \"Strongly agree\"],\n",
         "  labels = [\"disagree\", \"\", \"\", \"\", \"agree\"])\n",
@@ -463,7 +379,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "47fd3519",
+      "id": "4cbc411a",
       "execution_count": null,
       "outputs": []
     },
@@ -473,7 +389,7 @@
       "source": [
         "## Total slide cleanliness rating"
       ],
-      "id": "d5244e13"
+      "id": "51acfa31"
     },
     {
       "cell_type": "code",
@@ -499,7 +415,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "ae9e6d54",
+      "id": "74085602",
       "execution_count": null,
       "outputs": []
     },
@@ -513,7 +429,7 @@
         "Note that I swaped the x-axis to make it correspond to the previous plots (more right = better) \n",
         ":::"
       ],
-      "id": "507a0772"
+      "id": "f580a2c9"
     },
     {
       "cell_type": "code",
@@ -541,7 +457,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "5b554005",
+      "id": "f23836e9",
       "execution_count": null,
       "outputs": []
     },
@@ -552,7 +468,7 @@
         "## How many for which question correct?\n",
         "(not corrected for missing answers!)"
       ],
-      "id": "e4af4381"
+      "id": "d3924342"
     },
     {
       "cell_type": "code",
@@ -561,7 +477,7 @@
         "only_correct_counts = df_combined.loc[:, df_combined.columns.str.endswith('correct') & ~df_combined.columns.str.startswith('total')]\n",
         "print(only_correct_counts.sum()/len(only_correct_counts))"
       ],
-      "id": "90a9e10c",
+      "id": "53c0f97d",
       "execution_count": null,
       "outputs": []
     },
@@ -579,7 +495,7 @@
         "\n",
         "For the statistical evaluation, the category based answers need to be converted to numbers."
       ],
-      "id": "f8a2f617"
+      "id": "318885de"
     },
     {
       "cell_type": "code",
@@ -600,7 +516,7 @@
         "df_combined['slides_attractive_cat'] = df_combined['slides_attractive'].map(slides_scale)\n",
         "df_combined['slides_clean_simple_cat'] = df_combined['slides_clean_simple'].map(slides_scale)"
       ],
-      "id": "e4a928d3",
+      "id": "5556be24",
       "execution_count": null,
       "outputs": []
     },
@@ -610,7 +526,7 @@
       "source": [
         "# Statistics"
       ],
-      "id": "17efd39b"
+      "id": "85ceec38"
     },
     {
       "cell_type": "code",
@@ -625,7 +541,7 @@
         "  'Slide Attractiveness', \n",
         "  'Slide Simplicity']"
       ],
-      "id": "aadcb057",
+      "id": "abce16bc",
       "execution_count": null,
       "outputs": []
     },
@@ -636,7 +552,7 @@
         "## sample sizes\n",
         "Number of answers for each question and condition combination"
       ],
-      "id": "4bc5a6d2"
+      "id": "d8d88012"
     },
     {
       "cell_type": "code",
@@ -648,7 +564,7 @@
         "  df_combined[test_columns+['condition']].groupby(['condition']).count(),\n",
         "  headers = test_column_names))"
       ],
-      "id": "e020a93b",
+      "id": "6c4b94b2",
       "execution_count": null,
       "outputs": []
     },
@@ -668,7 +584,7 @@
         "non significant means normally distributed (or rather can't reject the null hypothesis)\n",
         ":::"
       ],
-      "id": "4fb9eb36"
+      "id": "d26131d9"
     },
     {
       "cell_type": "code",
@@ -684,7 +600,7 @@
         "    new_dict[condition] = {'S_result': S_result, 'p_value': p_value}\n",
         "  results[column] = new_dict"
       ],
-      "id": "33a4c44f",
+      "id": "ad62ed71",
       "execution_count": null,
       "outputs": []
     },
@@ -706,7 +622,7 @@
         "  print(\" \")\n",
         "  i = i + 1"
       ],
-      "id": "ac83cab3",
+      "id": "e3e667db",
       "execution_count": null,
       "outputs": []
     },
@@ -739,7 +655,7 @@
         "\n",
         "#### 30-chunks vs. 30-bullets"
       ],
-      "id": "53edcc9c"
+      "id": "7480f1d5"
     },
     {
       "cell_type": "code",
@@ -748,7 +664,7 @@
         "#| echo: false\n",
         "utest('30-chunks', '30-bullets')"
       ],
-      "id": "a0af6074",
+      "id": "990a02bc",
       "execution_count": null,
       "outputs": []
     },
@@ -758,7 +674,7 @@
       "source": [
         "#### 30-chunks vs. 30-para"
       ],
-      "id": "b84d7536"
+      "id": "f4d55093"
     },
     {
       "cell_type": "code",
@@ -767,7 +683,7 @@
         "#| echo: false\n",
         "utest('30-chunks', '30-para')"
       ],
-      "id": "2dfcca1f",
+      "id": "3479afc8",
       "execution_count": null,
       "outputs": []
     },
@@ -777,7 +693,7 @@
       "source": [
         "#### 50-chunks vs. 50-bullets"
       ],
-      "id": "19e3f97d"
+      "id": "2ba5132b"
     },
     {
       "cell_type": "code",
@@ -786,7 +702,7 @@
         "#| echo: false\n",
         "utest('50-chunks', '50-bullets')"
       ],
-      "id": "773a74bd",
+      "id": "52717dbd",
       "execution_count": null,
       "outputs": []
     },
@@ -796,7 +712,7 @@
       "source": [
         "#### 50-chunks vs. 50-para"
       ],
-      "id": "827e5b56"
+      "id": "4e3ce89a"
     },
     {
       "cell_type": "code",
@@ -805,7 +721,7 @@
         "#| echo: false\n",
         "utest('50-chunks', '50-para')"
       ],
-      "id": "a6757ead",
+      "id": "4124d311",
       "execution_count": null,
       "outputs": []
     },
@@ -815,7 +731,7 @@
       "source": [
         "#### 100-chunks vs. 100-bullets"
       ],
-      "id": "881cbd88"
+      "id": "dead9e46"
     },
     {
       "cell_type": "code",
@@ -824,7 +740,7 @@
         "#| echo: false\n",
         "utest('100-chunks', '100-bullets')"
       ],
-      "id": "6e95b9f9",
+      "id": "d3c31a46",
       "execution_count": null,
       "outputs": []
     },
@@ -834,7 +750,7 @@
       "source": [
         "#### 100-chunks vs. 100-para"
       ],
-      "id": "ccc7d7cc"
+      "id": "213121e4"
     },
     {
       "cell_type": "code",
@@ -843,7 +759,7 @@
         "#| echo: false\n",
         "utest('100-chunks', '100-para')"
       ],
-      "id": "3ed122aa",
+      "id": "8bf37853",
       "execution_count": null,
       "outputs": []
     },
@@ -855,7 +771,7 @@
         "\n",
         "#### 30-bullets vs. 50-bullets"
       ],
-      "id": "ed98604e"
+      "id": "2c095356"
     },
     {
       "cell_type": "code",
@@ -864,7 +780,7 @@
         "#| echo: false\n",
         "utest('30-bullets', '50-bullets')"
       ],
-      "id": "d5720b3f",
+      "id": "0172680c",
       "execution_count": null,
       "outputs": []
     },
@@ -874,7 +790,7 @@
       "source": [
         "#### 30-bullets vs. 100-bullets"
       ],
-      "id": "3c16467d"
+      "id": "7b3f3a6f"
     },
     {
       "cell_type": "code",
@@ -883,7 +799,7 @@
         "#| echo: false\n",
         "utest('30-bullets', '100-bullets')"
       ],
-      "id": "edf43876",
+      "id": "ab73d5dd",
       "execution_count": null,
       "outputs": []
     },
@@ -893,7 +809,7 @@
       "source": [
         "#### 50-bullets vs. 100-bullets"
       ],
-      "id": "3a7b0240"
+      "id": "0ba9baa0"
     },
     {
       "cell_type": "code",
@@ -902,7 +818,7 @@
         "#| echo: false\n",
         "utest('50-bullets', '100-bullets')"
       ],
-      "id": "33c25f81",
+      "id": "0dbe0328",
       "execution_count": null,
       "outputs": []
     },
@@ -920,7 +836,7 @@
         "\n",
         "#### 30-chunks vs. 100-bullets"
       ],
-      "id": "9c263082"
+      "id": "df5e00e3"
     },
     {
       "cell_type": "code",
@@ -929,7 +845,7 @@
         "#| echo: false\n",
         "utest('30-chunks', '100-bullets')"
       ],
-      "id": "6025a424",
+      "id": "14689106",
       "execution_count": null,
       "outputs": []
     },
@@ -939,7 +855,7 @@
       "source": [
         "#### 30-bullets vs. 100-bullets"
       ],
-      "id": "9f535a63"
+      "id": "ee6d747a"
     },
     {
       "cell_type": "code",
@@ -948,7 +864,7 @@
         "#| echo: false\n",
         "utest('30-bullets', '100-bullets')"
       ],
-      "id": "5fb0fffa",
+      "id": "a2f0efac",
       "execution_count": null,
       "outputs": []
     },
@@ -964,7 +880,7 @@
         "\n",
         "### Correlation between cognitive load and correct answers?"
       ],
-      "id": "471b9091"
+      "id": "85335172"
     },
     {
       "cell_type": "code",
@@ -992,7 +908,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "fa0f78c2",
+      "id": "35aa0cc1",
       "execution_count": null,
       "outputs": []
     },
@@ -1023,7 +939,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "96915f93",
+      "id": "0123d2ae",
       "execution_count": null,
       "outputs": []
     },
@@ -1033,7 +949,7 @@
       "source": [
         "### Correlation between slide simplicity and correct answers?"
       ],
-      "id": "5e856f45"
+      "id": "f6c8868f"
     },
     {
       "cell_type": "code",
@@ -1057,7 +973,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "9aa59439",
+      "id": "060b535c",
       "execution_count": null,
       "outputs": []
     },
@@ -1084,7 +1000,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "901c9afa",
+      "id": "64f71033",
       "execution_count": null,
       "outputs": []
     },
@@ -1094,7 +1010,7 @@
       "source": [
         "### Correlation between slide attractiveness and correct answers?"
       ],
-      "id": "856fff12"
+      "id": "b050af3c"
     },
     {
       "cell_type": "code",
@@ -1118,7 +1034,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "0d4b1fca",
+      "id": "f691f11d",
       "execution_count": null,
       "outputs": []
     },
@@ -1145,7 +1061,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "756177b9",
+      "id": "d2c3aee8",
       "execution_count": null,
       "outputs": []
     },
@@ -1157,7 +1073,7 @@
         "\n",
         "Number of people starting in each condition"
       ],
-      "id": "98560ee4"
+      "id": "352d4d50"
     },
     {
       "cell_type": "code",
@@ -1170,7 +1086,7 @@
         "\n",
         "df_combined.groupby(['condition']).count().max(axis = 1)"
       ],
-      "id": "6752fb8b",
+      "id": "a744a21c",
       "execution_count": null,
       "outputs": []
     },
@@ -1180,7 +1096,7 @@
       "source": [
         "Number of people who answered each question per condition"
       ],
-      "id": "5b7d31e3"
+      "id": "973286b8"
     },
     {
       "cell_type": "code",
@@ -1205,7 +1121,7 @@
         "\n",
         "df_combined.groupby(['condition']).agg(lambda x: x[((x != 0) & (x != \"<NA>\"))].count())[question_columns]"
       ],
-      "id": "bc87295f",
+      "id": "a7da2643",
       "execution_count": null,
       "outputs": []
     },
@@ -1221,7 +1137,7 @@
         "\n",
         "This is the number of correct answers for the first theme (total number, not relative amount to the people that actually answered -- check the table above for an idea how many people answered)."
       ],
-      "id": "8a9eb378"
+      "id": "88497047"
     },
     {
       "cell_type": "code",
@@ -1234,7 +1150,7 @@
         "\n",
         "df_combined[['condition', 'tiger_classified_correct', 'tiger_extinct_year_correct', 'tiger_extinct_why_correct']].groupby(['condition']).sum()"
       ],
-      "id": "7bbed790",
+      "id": "0232fff2",
       "execution_count": null,
       "outputs": []
     },
@@ -1244,7 +1160,7 @@
       "source": [
         "In contrast, the number of correct answers for the following themes:"
       ],
-      "id": "881af71c"
+      "id": "fe67529c"
     },
     {
       "cell_type": "code",
@@ -1259,7 +1175,7 @@
         "  'why_prioritize_earthlike_planets_correct',\n",
         "  'exoplanets_discovered_year_correct']].groupby(['condition']).sum()"
       ],
-      "id": "f7d69470",
+      "id": "0395fefc",
       "execution_count": null,
       "outputs": []
     },
@@ -1277,7 +1193,7 @@
         "  'what_role_crms_play_correct',\n",
         "  'relationship_24_7_efficiency_correct']].groupby(['condition']).sum()"
       ],
-      "id": "a1ac67ef",
+      "id": "ce028e8b",
       "execution_count": null,
       "outputs": []
     }

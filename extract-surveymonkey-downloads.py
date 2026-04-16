@@ -1,10 +1,19 @@
+
+# How it works:
+# - Point `zips_dir` at the folder containing your SurveyMonkey zip downloads.
+# - Each zip is extracted, the CSV inside the "CSV/Review these*.csv" path is pulled out,
+#   renamed to match the zip filename, and saved next to the zips.
+# - The temporary extracted folder is deleted afterwards.
+# - Run from any directory: python extract-surveymonkey-downloads.py
+
+
 import zipfile
 import shutil
 from pathlib import Path
 
 # Your folder of SurveyMonkey zips goes here...
 # ========================================================
-zips_dir = Path(r"E:\local-pytyon-projects\bullets-chunks-paragraphs\data\2026-April9-SurveyData\zips")
+zips_dir = Path(r"E:\local-pytyon-projects\bullets-chunks-paragraphs\data\2026-April16-SurveyData\zips")
 
 for zip_path in sorted(zips_dir.glob("*.zip")):
     extract_dir = zips_dir / zip_path.stem
