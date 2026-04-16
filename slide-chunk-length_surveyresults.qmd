@@ -33,75 +33,9 @@ from tabulate import tabulate
 
 # Function to read CSV and add condition column
 def read_csv_with_condition(file_path):
-    raw = pd.read_csv(file_path, header=None, nrows=2)
-    row0 = raw.iloc[0].tolist()
-    row1 = raw.iloc[1].tolist()
-
-    df = pd.read_csv(file_path, header=[0], skiprows=[1])
-
-    # Detect new SurveyMonkey export format (one column per answer option).
-    # Old format: sub-headers say 'Response'. New format: sub-headers contain option text.
-    is_new_format = (pd.notna(row1[9]) and
-                     str(row1[9]).strip() not in ('Response', 'Open-Ended Response'))
-
-    if is_new_format:
-        col_names = list(df.columns)
-
-        # Build groups: named column position -> list of following unnamed positions
-        groups = {}
-        current = None
-        for i, h in enumerate(row0):
-            if pd.notna(h):
-                current = i
-                groups[i] = []
-            elif current is not None:
-                groups[current].append(i)
-
-        cols_to_drop = []
-        cols_to_add = {}  # new column name -> merged series
-
-        for named_idx, unnamed_idxes in sorted(groups.items()):
-            if not unnamed_idxes:
-                continue
-
-            all_idxes = [named_idx] + unnamed_idxes
-            all_names = [col_names[i] for i in all_idxes]
-            subqs = [str(row1[i]) if pd.notna(row1[i]) else '' for i in all_idxes]
-
-            if ' - ' in subqs[0]:
-                # Rating/matrix: multiple sub-questions each with multiple options.
-                # Group columns by sub-question prefix (text before ' - ').
-                by_prefix = {}
-                for idx, sq in zip(all_idxes, subqs):
-                    prefix = sq.split(' - ')[0]
-                    by_prefix.setdefault(prefix, []).append(idx)
-
-                prefixes = list(by_prefix.keys())
-
-                # First sub-question: merge options into the named column
-                first_names = [col_names[i] for i in by_prefix[prefixes[0]]]
-                df[first_names[0]] = df[first_names].bfill(axis=1).iloc[:, 0]
-                cols_to_drop.extend(first_names[1:])
-
-                # Additional sub-questions: collect under 'Unnamed: 19' for
-                # backward compatibility with rename_map -> slides_clean_simple
-                extra_keys = ['Unnamed: 19']
-                for k, prefix in enumerate(prefixes[1:]):
-                    sub_names = [col_names[i] for i in by_prefix[prefix]]
-                    new_name = extra_keys[k] if k < len(extra_keys) else f'_subq_{k + 1}'
-                    cols_to_add[new_name] = df[sub_names].bfill(axis=1).iloc[:, 0]
-                    cols_to_drop.extend(sub_names)
-            else:
-                # Single-answer MCQ: merge all option columns into the named column
-                df[all_names[0]] = df[all_names].bfill(axis=1).iloc[:, 0]
-                cols_to_drop.extend(all_names[1:])
-
-        df.drop(columns=[c for c in cols_to_drop if c in df.columns], inplace=True)
-        for new_name, series in cols_to_add.items():
-            df[new_name] = series
-
-    condition_name = os.path.splitext(os.path.basename(file_path))[0].replace(study_name+"-", "").replace("-"+study_name, "")
-    df['condition'] = condition_name
+    df = pd.read_csv(file_path, header=[0], skiprows = [1])
+    condition_name = os.path.splitext(os.path.basename(file_path))[0].replace(study_name+"-", "")  # Get filename without extension and remove the study round
+    df['condition'] = condition_name  # Add condition column
     df['conditionLength'] = int(condition_name.split('-')[0])
     df['conditionType'] = condition_name.split('-')[1]
     return df, condition_name
@@ -125,7 +59,7 @@ def clean_column_names(columns):
 def add_correctness_columns(df, answer_map):
     for column, correct_answer in answer_map.items():
         if column in df.columns:
-            df[column] = df[column].fillna("")
+            df[column] = df[column].fillna(0)
             # Create a new column with 1 if correct, 0 if incorrect
             df[f'{column}_correct'] = np.where(df[column].str.strip().str.lower() == correct_answer.lower(), 1, 0)
     return df
@@ -167,15 +101,7 @@ def utest(cond1, cond2):
 
 ```{python}
 study_name = "pg"
-data_dir = os.path.join(os.getcwd(), "data/2026-April16-SurveyData")
-file_list = glob.glob(os.path.join(data_dir, study_name+"-*.csv")) # <1>
-
-for f in file_list:
-    print(os.path.basename(f))
-
-# Check that file exists
-if not file_list:
-    raise FileNotFoundError(f"No files found for study round '{study_name}' in directory '{data_dir}'.")
+file_list = glob.glob(os.path.join(os.getcwd(), "2025-10-19_SurveyData", study_name+"*.csv")) # <1>
 
 df_combined = pd.DataFrame({})
 condition_list = []
@@ -194,8 +120,6 @@ df_combined = df_combined.convert_dtypes() # <5>
 3. Create dataframe with all the data.
 4. Create a list of all studied conditions
 5. To make processing easier, we convert the data types for the whole data frame right away.
-
-
 
 # Clean data
 
@@ -299,12 +223,9 @@ These are bar graphs for each condition. The three columns correspond to the thr
 #| message: false
 #| warning: false
 
-means_correct = df_combined.groupby(['conditionlength', 'conditiontype'])['total_correct'].mean().reset_index()
-
 p = (
   ggplot(df_combined, aes(x = "total_correct")) 
   + geom_histogram(binwidth = 1, fill = "grey", color = "black")
-  + geom_vline(means_correct, aes(xintercept = "total_correct"), color = "red")
   + facet_grid('conditionlength~conditiontype')
   + theme_light() 
   + labs(x = "Number of correct answers", y = "Number of each answer")
@@ -322,15 +243,10 @@ p.show()
 #| warning: false
 
 df_combined["slides_attractive"] = df_combined["slides_attractive"].astype(str)
-slides_scale = {"Strongly disagree": -2, "Disagree": -1, 
-  "Neither agree nor disagree": 0, "Agree": 1, "Strongly agree": 2}
-df_combined['slides_attractive_cat'] = df_combined['slides_attractive'].map(slides_scale)
-means_attractive = df_combined.groupby(['conditionlength', 'conditiontype'])['slides_attractive_cat'].mean().reset_index()
 
 p = (
   ggplot(df_combined, aes(x = "slides_attractive")) 
   + geom_histogram(binwidth = 1, fill = "grey", color = "black")
-  + geom_vline(means_attractive, aes(xintercept = "slides_attractive_cat"), color = "red")
   + scale_x_discrete(limits=["Strongly disagree", "Disagree", 
   "Neither agree nor disagree", "Agree", "Strongly agree"],
   labels = ["disagree", "", "", "", "agree"])
