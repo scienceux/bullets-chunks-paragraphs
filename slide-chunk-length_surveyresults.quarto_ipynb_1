@@ -16,7 +16,7 @@
         "date: today\n",
         "---"
       ],
-      "id": "86df974a"
+      "id": "633efa51"
     },
     {
       "cell_type": "code",
@@ -37,7 +37,7 @@
         "from IPython.display import Markdown, display\n",
         "from tabulate import tabulate"
       ],
-      "id": "80c319e6",
+      "id": "3329ea0b",
       "execution_count": null,
       "outputs": []
     },
@@ -47,7 +47,7 @@
       "source": [
         "# Functions"
       ],
-      "id": "201e64db"
+      "id": "fa8b365f"
     },
     {
       "cell_type": "code",
@@ -120,7 +120,7 @@
         "\n",
         "  display(Markdown(df.to_markdown()))"
       ],
-      "id": "68a48ccc",
+      "id": "6db03546",
       "execution_count": null,
       "outputs": []
     },
@@ -130,14 +130,14 @@
       "source": [
         "# Load data"
       ],
-      "id": "5c04dd3c"
+      "id": "f6196b30"
     },
     {
       "cell_type": "code",
       "metadata": {},
       "source": [
         "study_name = \"pg\"\n",
-        "file_list = glob.glob(os.path.join(os.getcwd(), \"data/2025-10-19_SurveyData\", study_name+\"*.csv\")) # <1>\n",
+        "file_list = glob.glob(os.path.join(os.getcwd(), \"data/2026-April16-SurveyData\", study_name+\"*.csv\")) # <1>\n",
         "\n",
         "for f in file_list:\n",
         "    print(os.path.basename(f))\n",
@@ -152,7 +152,7 @@
         "\n",
         "df_combined = df_combined.convert_dtypes() # <5>"
       ],
-      "id": "6ef6ab86",
+      "id": "b2b51099",
       "execution_count": null,
       "outputs": []
     },
@@ -170,7 +170,7 @@
         "\n",
         "Rename columns to make processing easier"
       ],
-      "id": "a88a89fb"
+      "id": "2078aa0c"
     },
     {
       "cell_type": "code",
@@ -213,7 +213,7 @@
         "\n",
         "df_combined.columns = clean_column_names(df_combined.columns)"
       ],
-      "id": "d9e7d2b9",
+      "id": "6ac35600",
       "execution_count": null,
       "outputs": []
     },
@@ -223,7 +223,7 @@
       "source": [
         "Remove empty columns"
       ],
-      "id": "0aee1beb"
+      "id": "54298d97"
     },
     {
       "cell_type": "code",
@@ -232,7 +232,7 @@
         "blank_columns = [col for col in df_combined.columns if df_combined[col].isna().all()]\n",
         "df_combined.drop(columns=blank_columns, inplace=True)"
       ],
-      "id": "d5415334",
+      "id": "30b6237d",
       "execution_count": null,
       "outputs": []
     },
@@ -242,7 +242,7 @@
       "source": [
         "Remove duplicates"
       ],
-      "id": "7c5861cd"
+      "id": "1472ff87"
     },
     {
       "cell_type": "code",
@@ -251,7 +251,7 @@
         "#https://stackoverflow.com/questions/23512339/drop-duplicates-while-preserving-nans-in-pandas\n",
         "df_combined = df_combined[(~df_combined.duplicated()) ]"
       ],
-      "id": "a8f2f8bb",
+      "id": "94e5941b",
       "execution_count": null,
       "outputs": []
     },
@@ -263,7 +263,7 @@
         "\n",
         "Dictionary with correct answers"
       ],
-      "id": "a58ffc73"
+      "id": "86569660"
     },
     {
       "cell_type": "code",
@@ -283,7 +283,7 @@
         "    'relationship_24_7_efficiency': '24/7 support boosts efficiency.'\n",
         "}"
       ],
-      "id": "85e2d0e1",
+      "id": "3794747b",
       "execution_count": null,
       "outputs": []
     },
@@ -293,7 +293,7 @@
       "source": [
         "Check the answers and calculate total correct answers per participant"
       ],
-      "id": "8d6b0e62"
+      "id": "b32c41d0"
     },
     {
       "cell_type": "code",
@@ -305,7 +305,7 @@
         "df_combined = add_correctness_columns(df_combined, correct_answers) # <2>\n",
         "df_combined = add_total_correct_column(df_combined) # <3>"
       ],
-      "id": "08677a3d",
+      "id": "cd38a144",
       "execution_count": null,
       "outputs": []
     },
@@ -325,7 +325,7 @@
         "\n",
         "## Total of correct answers"
       ],
-      "id": "64c30501"
+      "id": "fd07d7c1"
     },
     {
       "cell_type": "code",
@@ -346,7 +346,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "9605f493",
+      "id": "118b8638",
       "execution_count": null,
       "outputs": []
     },
@@ -356,7 +356,7 @@
       "source": [
         "## Total slide attractiveness rating"
       ],
-      "id": "4954fdab"
+      "id": "5d95549c"
     },
     {
       "cell_type": "code",
@@ -382,7 +382,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "030580cf",
+      "id": "a5b41f08",
       "execution_count": null,
       "outputs": []
     },
@@ -392,7 +392,7 @@
       "source": [
         "## Total slide cleanliness rating"
       ],
-      "id": "44acabff"
+      "id": "b271cf11"
     },
     {
       "cell_type": "code",
@@ -418,7 +418,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "5ace5ddf",
+      "id": "8726439e",
       "execution_count": null,
       "outputs": []
     },
@@ -432,7 +432,7 @@
         "Note that I swaped the x-axis to make it correspond to the previous plots (more right = better) \n",
         ":::"
       ],
-      "id": "633e7707"
+      "id": "6b9016d9"
     },
     {
       "cell_type": "code",
@@ -460,7 +460,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "5d220f01",
+      "id": "3b9506e3",
       "execution_count": null,
       "outputs": []
     },
@@ -471,7 +471,7 @@
         "## How many for which question correct?\n",
         "(not corrected for missing answers!)"
       ],
-      "id": "5ea8914a"
+      "id": "e347fc34"
     },
     {
       "cell_type": "code",
@@ -480,7 +480,7 @@
         "only_correct_counts = df_combined.loc[:, df_combined.columns.str.endswith('correct') & ~df_combined.columns.str.startswith('total')]\n",
         "print(only_correct_counts.sum()/len(only_correct_counts))"
       ],
-      "id": "f9278813",
+      "id": "53bba39a",
       "execution_count": null,
       "outputs": []
     },
@@ -498,7 +498,7 @@
         "\n",
         "For the statistical evaluation, the category based answers need to be converted to numbers."
       ],
-      "id": "8de71ce3"
+      "id": "3e10461f"
     },
     {
       "cell_type": "code",
@@ -519,7 +519,7 @@
         "df_combined['slides_attractive_cat'] = df_combined['slides_attractive'].map(slides_scale)\n",
         "df_combined['slides_clean_simple_cat'] = df_combined['slides_clean_simple'].map(slides_scale)"
       ],
-      "id": "4b9bda37",
+      "id": "46473caf",
       "execution_count": null,
       "outputs": []
     },
@@ -529,7 +529,7 @@
       "source": [
         "# Statistics"
       ],
-      "id": "ac5ed1f9"
+      "id": "f29d10fe"
     },
     {
       "cell_type": "code",
@@ -544,7 +544,7 @@
         "  'Slide Attractiveness', \n",
         "  'Slide Simplicity']"
       ],
-      "id": "65ffe119",
+      "id": "26cb0b03",
       "execution_count": null,
       "outputs": []
     },
@@ -555,7 +555,7 @@
         "## sample sizes\n",
         "Number of answers for each question and condition combination"
       ],
-      "id": "a14a5a41"
+      "id": "bc6082e3"
     },
     {
       "cell_type": "code",
@@ -567,7 +567,7 @@
         "  df_combined[test_columns+['condition']].groupby(['condition']).count(),\n",
         "  headers = test_column_names))"
       ],
-      "id": "30641f61",
+      "id": "0362db6f",
       "execution_count": null,
       "outputs": []
     },
@@ -587,7 +587,7 @@
         "non significant means normally distributed (or rather can't reject the null hypothesis)\n",
         ":::"
       ],
-      "id": "57aacc25"
+      "id": "e0244a4d"
     },
     {
       "cell_type": "code",
@@ -603,7 +603,7 @@
         "    new_dict[condition] = {'S_result': S_result, 'p_value': p_value}\n",
         "  results[column] = new_dict"
       ],
-      "id": "fe9aa39a",
+      "id": "a2c38dd2",
       "execution_count": null,
       "outputs": []
     },
@@ -625,7 +625,7 @@
         "  print(\" \")\n",
         "  i = i + 1"
       ],
-      "id": "211d4561",
+      "id": "c8101dc3",
       "execution_count": null,
       "outputs": []
     },
@@ -658,7 +658,7 @@
         "\n",
         "#### 30-chunks vs. 30-bullets"
       ],
-      "id": "c7c56e49"
+      "id": "2aa03f86"
     },
     {
       "cell_type": "code",
@@ -667,7 +667,7 @@
         "#| echo: false\n",
         "utest('30-chunks', '30-bullets')"
       ],
-      "id": "f5bfbb00",
+      "id": "974de58b",
       "execution_count": null,
       "outputs": []
     },
@@ -677,7 +677,7 @@
       "source": [
         "#### 30-chunks vs. 30-para"
       ],
-      "id": "c47a04fe"
+      "id": "a3b1b39c"
     },
     {
       "cell_type": "code",
@@ -686,7 +686,7 @@
         "#| echo: false\n",
         "utest('30-chunks', '30-para')"
       ],
-      "id": "12354229",
+      "id": "8f2fdb6b",
       "execution_count": null,
       "outputs": []
     },
@@ -696,7 +696,7 @@
       "source": [
         "#### 50-chunks vs. 50-bullets"
       ],
-      "id": "80d40f2d"
+      "id": "5af3580d"
     },
     {
       "cell_type": "code",
@@ -705,7 +705,7 @@
         "#| echo: false\n",
         "utest('50-chunks', '50-bullets')"
       ],
-      "id": "bfcaf834",
+      "id": "36721c71",
       "execution_count": null,
       "outputs": []
     },
@@ -715,7 +715,7 @@
       "source": [
         "#### 50-chunks vs. 50-para"
       ],
-      "id": "91cc6d0c"
+      "id": "1a71cbaa"
     },
     {
       "cell_type": "code",
@@ -724,7 +724,7 @@
         "#| echo: false\n",
         "utest('50-chunks', '50-para')"
       ],
-      "id": "16b843d5",
+      "id": "dabb4717",
       "execution_count": null,
       "outputs": []
     },
@@ -734,7 +734,7 @@
       "source": [
         "#### 100-chunks vs. 100-bullets"
       ],
-      "id": "bac2ac3b"
+      "id": "67db8caa"
     },
     {
       "cell_type": "code",
@@ -743,7 +743,7 @@
         "#| echo: false\n",
         "utest('100-chunks', '100-bullets')"
       ],
-      "id": "742012a8",
+      "id": "8671b561",
       "execution_count": null,
       "outputs": []
     },
@@ -753,7 +753,7 @@
       "source": [
         "#### 100-chunks vs. 100-para"
       ],
-      "id": "bcfa7940"
+      "id": "3effcd52"
     },
     {
       "cell_type": "code",
@@ -762,7 +762,7 @@
         "#| echo: false\n",
         "utest('100-chunks', '100-para')"
       ],
-      "id": "ed8cdaec",
+      "id": "fb29d469",
       "execution_count": null,
       "outputs": []
     },
@@ -774,7 +774,7 @@
         "\n",
         "#### 30-bullets vs. 50-bullets"
       ],
-      "id": "dccd6e2d"
+      "id": "a9853391"
     },
     {
       "cell_type": "code",
@@ -783,7 +783,7 @@
         "#| echo: false\n",
         "utest('30-bullets', '50-bullets')"
       ],
-      "id": "71f67180",
+      "id": "6041fbe9",
       "execution_count": null,
       "outputs": []
     },
@@ -793,7 +793,7 @@
       "source": [
         "#### 30-bullets vs. 100-bullets"
       ],
-      "id": "4e2dcc1c"
+      "id": "83c3974a"
     },
     {
       "cell_type": "code",
@@ -802,7 +802,7 @@
         "#| echo: false\n",
         "utest('30-bullets', '100-bullets')"
       ],
-      "id": "e6fe89ac",
+      "id": "84534a27",
       "execution_count": null,
       "outputs": []
     },
@@ -812,7 +812,7 @@
       "source": [
         "#### 50-bullets vs. 100-bullets"
       ],
-      "id": "c43cea15"
+      "id": "68ff9215"
     },
     {
       "cell_type": "code",
@@ -821,7 +821,7 @@
         "#| echo: false\n",
         "utest('50-bullets', '100-bullets')"
       ],
-      "id": "986f9c01",
+      "id": "2e8db2cd",
       "execution_count": null,
       "outputs": []
     },
@@ -839,7 +839,7 @@
         "\n",
         "#### 30-chunks vs. 100-bullets"
       ],
-      "id": "74e4e8eb"
+      "id": "6344e565"
     },
     {
       "cell_type": "code",
@@ -848,7 +848,7 @@
         "#| echo: false\n",
         "utest('30-chunks', '100-bullets')"
       ],
-      "id": "b2622bf3",
+      "id": "aea6acc0",
       "execution_count": null,
       "outputs": []
     },
@@ -858,7 +858,7 @@
       "source": [
         "#### 30-bullets vs. 100-bullets"
       ],
-      "id": "ce9a1edf"
+      "id": "c648148a"
     },
     {
       "cell_type": "code",
@@ -867,7 +867,7 @@
         "#| echo: false\n",
         "utest('30-bullets', '100-bullets')"
       ],
-      "id": "657125c0",
+      "id": "4614c7a9",
       "execution_count": null,
       "outputs": []
     },
@@ -883,7 +883,7 @@
         "\n",
         "### Correlation between cognitive load and correct answers?"
       ],
-      "id": "42371380"
+      "id": "26d7aaa4"
     },
     {
       "cell_type": "code",
@@ -911,7 +911,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "8b7a2c56",
+      "id": "69daf7e9",
       "execution_count": null,
       "outputs": []
     },
@@ -942,7 +942,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "71f31cb7",
+      "id": "c69acb42",
       "execution_count": null,
       "outputs": []
     },
@@ -952,7 +952,7 @@
       "source": [
         "### Correlation between slide simplicity and correct answers?"
       ],
-      "id": "bcc861b0"
+      "id": "ae6a6b13"
     },
     {
       "cell_type": "code",
@@ -976,7 +976,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "4f111d0c",
+      "id": "61da51a8",
       "execution_count": null,
       "outputs": []
     },
@@ -1003,7 +1003,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "9b7b73f3",
+      "id": "17c77ff8",
       "execution_count": null,
       "outputs": []
     },
@@ -1013,7 +1013,7 @@
       "source": [
         "### Correlation between slide attractiveness and correct answers?"
       ],
-      "id": "185a354f"
+      "id": "7203c9ae"
     },
     {
       "cell_type": "code",
@@ -1037,7 +1037,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "c626ab66",
+      "id": "84e5393f",
       "execution_count": null,
       "outputs": []
     },
@@ -1064,7 +1064,7 @@
         "\n",
         "p.show()"
       ],
-      "id": "b249e237",
+      "id": "b99f9c88",
       "execution_count": null,
       "outputs": []
     },
@@ -1076,7 +1076,7 @@
         "\n",
         "Number of people starting in each condition"
       ],
-      "id": "d8564ae1"
+      "id": "9af4d252"
     },
     {
       "cell_type": "code",
@@ -1089,7 +1089,7 @@
         "\n",
         "df_combined.groupby(['condition']).count().max(axis = 1)"
       ],
-      "id": "fd703e02",
+      "id": "7890851b",
       "execution_count": null,
       "outputs": []
     },
@@ -1099,7 +1099,7 @@
       "source": [
         "Number of people who answered each question per condition"
       ],
-      "id": "73e19e96"
+      "id": "f2833c2c"
     },
     {
       "cell_type": "code",
@@ -1124,7 +1124,7 @@
         "\n",
         "df_combined.groupby(['condition']).agg(lambda x: x[((x != 0) & (x != \"<NA>\"))].count())[question_columns]"
       ],
-      "id": "7c1b9547",
+      "id": "a0aa53c7",
       "execution_count": null,
       "outputs": []
     },
@@ -1140,7 +1140,7 @@
         "\n",
         "This is the number of correct answers for the first theme (total number, not relative amount to the people that actually answered -- check the table above for an idea how many people answered)."
       ],
-      "id": "ff2fe629"
+      "id": "7d67bfa7"
     },
     {
       "cell_type": "code",
@@ -1153,7 +1153,7 @@
         "\n",
         "df_combined[['condition', 'tiger_classified_correct', 'tiger_extinct_year_correct', 'tiger_extinct_why_correct']].groupby(['condition']).sum()"
       ],
-      "id": "66a57cbd",
+      "id": "36cc3f39",
       "execution_count": null,
       "outputs": []
     },
@@ -1163,7 +1163,7 @@
       "source": [
         "In contrast, the number of correct answers for the following themes:"
       ],
-      "id": "fd60a54d"
+      "id": "befde875"
     },
     {
       "cell_type": "code",
@@ -1178,7 +1178,7 @@
         "  'why_prioritize_earthlike_planets_correct',\n",
         "  'exoplanets_discovered_year_correct']].groupby(['condition']).sum()"
       ],
-      "id": "5940756c",
+      "id": "193348e7",
       "execution_count": null,
       "outputs": []
     },
@@ -1196,7 +1196,7 @@
         "  'what_role_crms_play_correct',\n",
         "  'relationship_24_7_efficiency_correct']].groupby(['condition']).sum()"
       ],
-      "id": "2882171d",
+      "id": "adb6259c",
       "execution_count": null,
       "outputs": []
     }
