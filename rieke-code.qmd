@@ -22,6 +22,8 @@ import random
 import numpy as np
 import scipy.stats as stats
 import statsmodels.stats.multicomp as mc
+import statsmodels.formula.api as smf
+from statsmodels.stats.anova import anova_lm
 from plotnine import * 
 from IPython.display import Markdown, display
 from tabulate import tabulate
@@ -723,4 +725,186 @@ df_combined[['condition',
   'what_chatbots_reduce_correct',
   'what_role_crms_play_correct',
   'relationship_24_7_efficiency_correct']].groupby(['condition']).sum()
+```
+
+# Main Effects
+
+The previous analysis used pairwise comparisons. Here, we test for the main effects of slide length and format, as well as their interaction, on our outcome variables.
+
+This section moves from condition-by-condition comparisons to a model-based view of the 3x3 design, so we can see whether length, format, or their interaction explains the outcomes.
+
+```{python}
+#| echo: false
+#| message: false
+#| warning: false
+
+df_combined['conditionLength_f'] = df_combined['conditionlength'].astype(str)
+
+def main_effect_table(data, outcome_column):
+  model_data = data[['conditionlength', 'conditiontype', outcome_column]].dropna().copy()
+  model_data['conditionlength'] = model_data['conditionlength'].astype(str)
+  model_data['conditiontype'] = model_data['conditiontype'].astype(str)
+  model_data[outcome_column] = pd.to_numeric(model_data[outcome_column], errors='coerce')
+  model_data = model_data.dropna(subset=[outcome_column])
+  model_data[outcome_column] = model_data[outcome_column].astype(float)
+
+  model = smf.ols(f"{outcome_column} ~ C(conditionlength) * C(conditiontype)", data=model_data).fit()
+  anova_df = anova_lm(model, typ=2).reset_index()
+  anova_df = anova_df[anova_df['index'].isin([
+    'C(conditionlength)',
+    'C(conditiontype)',
+    'C(conditionlength):C(conditiontype)'
+  ])].copy()
+  anova_df['Effect'] = anova_df['index'].replace({
+    'C(conditionlength)': 'Slide length',
+    'C(conditiontype)': 'Format',
+    'C(conditionlength):C(conditiontype)': 'Length x format'
+  })
+  anova_df['Significant'] = np.where(anova_df['PR(>F)'] < 0.05, 'Yes', 'No')
+  return anova_df[['Effect', 'F', 'PR(>F)', 'Significant']].rename(columns={'PR(>F)': 'p_value'})
+
+def outcome_plot(data, outcome_column, outcome_label, y_breaks=None, y_labels=None):
+  p = (
+    ggplot(data, aes(x='conditionLength_f', y=outcome_column, fill='conditiontype'))
+    + geom_boxplot(position=position_dodge(width=0.75), alpha=0.65, outlier_alpha=0.35)
+    + geom_jitter(position=position_jitterdodge(jitter_width=0.12, dodge_width=0.75), alpha=0.35, size=1)
+    + theme_light()
+    + labs(x='Slide length', y=outcome_label, fill='Format')
+  )
+  if y_breaks is not None:
+    if y_labels is None:
+      p = p + scale_y_continuous(breaks=y_breaks)
+    else:
+      p = p + scale_y_continuous(breaks=y_breaks, labels=y_labels)
+  return p
+
+def outcome_trend_plot(data, outcome_column, outcome_label, y_breaks=None, y_labels=None):
+  trend_data = (
+    data[['conditionlength', 'conditiontype', outcome_column]]
+    .dropna()
+    .copy()
+  )
+  trend_data[outcome_column] = pd.to_numeric(trend_data[outcome_column], errors='coerce')
+  trend_data = trend_data.dropna(subset=[outcome_column])
+  trend_data['conditionlength_num'] = pd.to_numeric(trend_data['conditionlength'], errors='coerce')
+  trend_data = trend_data.dropna(subset=['conditionlength_num'])
+
+  trend_summary = (
+    trend_data
+    .groupby(['conditionlength_num', 'conditiontype'], as_index=False)[outcome_column]
+    .mean()
+  )
+
+  p = (
+    ggplot(trend_summary, aes(x='conditionlength_num', y=outcome_column, color='conditiontype', group='conditiontype'))
+    + geom_line(size=1)
+    + geom_point(size=2)
+    + theme_light()
+    + scale_x_continuous(breaks=[30, 50, 100])
+    + labs(x='Slide length (numeric)', y=outcome_label, color='Format')
+  )
+
+  if y_breaks is not None:
+    if y_labels is None:
+      p = p + scale_y_continuous(breaks=y_breaks)
+    else:
+      p = p + scale_y_continuous(breaks=y_breaks, labels=y_labels)
+
+  return p
+
+def numeric_trend_takeaway(data, outcome_column, positive_text, negative_text):
+  trend_data = (
+    data[['conditionlength', outcome_column]]
+    .dropna()
+    .copy()
+  )
+  trend_data[outcome_column] = pd.to_numeric(trend_data[outcome_column], errors='coerce')
+  trend_data['conditionlength_num'] = pd.to_numeric(trend_data['conditionlength'], errors='coerce')
+  trend_data = trend_data.dropna(subset=[outcome_column, 'conditionlength_num'])
+
+  if len(trend_data) < 3:
+    return 'Overall trend could not be estimated.'
+
+  trend_model = smf.ols(f"{outcome_column} ~ conditionlength_num", data=trend_data).fit()
+  slope = trend_model.params.get('conditionlength_num', np.nan)
+  p_value = trend_model.pvalues.get('conditionlength_num', np.nan)
+
+  if pd.isna(slope) or pd.isna(p_value) or p_value >= 0.05:
+    return 'No clear overall linear trend by slide length.'
+
+  return positive_text if slope > 0 else negative_text
+
+outcome_specs = [
+  {
+    'title': 'Learning / correct answers',
+    'column': 'total_correct',
+    'label': 'Number of correct answers',
+    'y_breaks': list(range(0, 10)),
+    'y_labels': None,
+    'takeaway_positive': 'Overall, longer slides improve learning.',
+    'takeaway_negative': 'Overall, longer slides hurt learning.',
+  },
+  {
+    'title': 'Appeal / slide attractiveness',
+    'column': 'slides_attractive_cat',
+    'label': 'Attractiveness rating',
+    'y_breaks': [-2, -1, 0, 1, 2],
+    'y_labels': ['Strongly disagree', 'Disagree', 'Neither agree nor disagree', 'Agree', 'Strongly agree'],
+    'takeaway_positive': 'Overall, longer slides increase perceived attractiveness.',
+    'takeaway_negative': 'Overall, longer slides reduce perceived attractiveness.',
+  },
+  {
+    'title': 'Cognitive load',
+    'column': 'cognitive_load_cat',
+    'label': 'Cognitive load rating',
+    'y_breaks': [-2, -1, 0, 1, 2],
+    'y_labels': ['Very low mental effort', 'Low mental effort', 'Neither low nor high mental effort', 'High mental effort', 'Very high mental effort'],
+    'takeaway_positive': 'Overall, longer slides increase cognitive load.',
+    'takeaway_negative': 'Overall, longer slides reduce cognitive load.',
+  },
+  {
+    'title': 'Slide simplicity',
+    'column': 'slides_clean_simple_cat',
+    'label': 'Simplicity rating',
+    'y_breaks': [-2, -1, 0, 1, 2],
+    'y_labels': ['Strongly disagree', 'Disagree', 'Neither agree nor disagree', 'Agree', 'Strongly agree'],
+    'takeaway_positive': 'Overall, longer slides are rated as more simple and clean.',
+    'takeaway_negative': 'Overall, longer slides are rated as less simple and clean.',
+  },
+]
+
+for spec in outcome_specs:
+  df_plot = df_combined.dropna(subset=[spec['column']])
+  display(Markdown(f"### {spec['title']}"))
+  plot = outcome_plot(
+    df_plot,
+    spec['column'],
+    spec['label'],
+    y_breaks=spec['y_breaks'],
+    y_labels=spec['y_labels']
+  )
+  plot.show()
+  display(Markdown("**Main effects table**"))
+  display(Markdown(main_effect_table(df_plot, spec['column']).to_markdown(index=False)))
+  takeaway_title = numeric_trend_takeaway(
+    df_plot,
+    spec['column'],
+    spec['takeaway_positive'],
+    spec['takeaway_negative']
+  )
+  display(Markdown(f"**{takeaway_title}**"))
+  trend_plot = outcome_trend_plot(
+    df_plot,
+    spec['column'],
+    spec['label'],
+    y_breaks=spec['y_breaks'],
+    y_labels=spec['y_labels']
+  )
+  trend_plot.show()
+  display(Markdown("""
+::: {.callout-caution}
+This numeric trend plot treats slide length as a continuous predictor and assumes a linear trend across 30, 50, and 100. In this study, slide length was experimentally manipulated in discrete categories, so this plot is best interpreted as a descriptive trend view rather than definitive evidence of linearity.
+:::
+"""))
+  print(" ")
 ```
