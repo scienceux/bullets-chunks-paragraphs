@@ -763,22 +763,29 @@ def main_effect_table(data, outcome_column):
   anova_df['Significant'] = np.where(anova_df['PR(>F)'] < 0.05, 'Yes', 'No')
   return anova_df[['Effect', 'F', 'PR(>F)', 'Significant']].rename(columns={'PR(>F)': 'p_value'})
 
-def outcome_plot(data, outcome_column, outcome_label, y_breaks=None, y_labels=None):
+def outcome_plot(data, outcome_column, outcome_label, y_breaks=None, y_labels=None, y_limits=None):
   p = (
     ggplot(data, aes(x='conditionLength_f', y=outcome_column, fill='conditiontype'))
-    + geom_boxplot(position=position_dodge(width=0.75), alpha=0.65, outlier_alpha=0.35)
+    + geom_violin(position=position_dodge(width=0.75), alpha=0.65, trim=False)
     + geom_jitter(position=position_jitterdodge(jitter_width=0.12, dodge_width=0.75), alpha=0.35, size=1)
+    + scale_x_discrete(limits=['30', '50', '100'])
     + theme_light()
     + labs(x='Slide length', y=outcome_label, fill='Format')
   )
   if y_breaks is not None:
     if y_labels is None:
-      p = p + scale_y_continuous(breaks=y_breaks)
+      if y_limits is None:
+        p = p + scale_y_continuous(breaks=y_breaks)
+      else:
+        p = p + scale_y_continuous(breaks=y_breaks, limits=y_limits)
     else:
-      p = p + scale_y_continuous(breaks=y_breaks, labels=y_labels)
+      if y_limits is None:
+        p = p + scale_y_continuous(breaks=y_breaks, labels=y_labels)
+      else:
+        p = p + scale_y_continuous(breaks=y_breaks, labels=y_labels, limits=y_limits)
   return p
 
-def outcome_trend_plot(data, outcome_column, outcome_label, y_breaks=None, y_labels=None):
+def outcome_trend_plot(data, outcome_column, outcome_label, y_breaks=None, y_labels=None, y_limits=None):
   trend_data = (
     data[['conditionlength', 'conditiontype', outcome_column]]
     .dropna()
@@ -806,9 +813,15 @@ def outcome_trend_plot(data, outcome_column, outcome_label, y_breaks=None, y_lab
 
   if y_breaks is not None:
     if y_labels is None:
-      p = p + scale_y_continuous(breaks=y_breaks)
+      if y_limits is None:
+        p = p + scale_y_continuous(breaks=y_breaks)
+      else:
+        p = p + scale_y_continuous(breaks=y_breaks, limits=y_limits)
     else:
-      p = p + scale_y_continuous(breaks=y_breaks, labels=y_labels)
+      if y_limits is None:
+        p = p + scale_y_continuous(breaks=y_breaks, labels=y_labels)
+      else:
+        p = p + scale_y_continuous(breaks=y_breaks, labels=y_labels, limits=y_limits)
 
   return p
 
@@ -840,7 +853,8 @@ outcome_specs = [
     'column': 'total_correct',
     'label': 'Number of correct answers',
     'y_breaks': list(range(0, 10)),
-    'y_labels': None,
+    'y_labels': ['0 correct', '1 correct', '2 correct', '3 correct', '4 correct', '5 correct', '6 correct', '7 correct', '8 correct', '9 correct'],
+    'y_limits': (-0.5, 9.5),
     'takeaway_positive': 'Overall, longer slides improve learning.',
     'takeaway_negative': 'Overall, longer slides hurt learning.',
   },
@@ -850,6 +864,7 @@ outcome_specs = [
     'label': 'Attractiveness rating',
     'y_breaks': [-2, -1, 0, 1, 2],
     'y_labels': ['Strongly disagree', 'Disagree', 'Neither agree nor disagree', 'Agree', 'Strongly agree'],
+    'y_limits': (-2.2, 2.2),
     'takeaway_positive': 'Overall, longer slides increase perceived attractiveness.',
     'takeaway_negative': 'Overall, longer slides reduce perceived attractiveness.',
   },
@@ -859,6 +874,7 @@ outcome_specs = [
     'label': 'Cognitive load rating',
     'y_breaks': [-2, -1, 0, 1, 2],
     'y_labels': ['Very low mental effort', 'Low mental effort', 'Neither low nor high mental effort', 'High mental effort', 'Very high mental effort'],
+    'y_limits': (-2.2, 2.2),
     'takeaway_positive': 'Overall, longer slides increase cognitive load.',
     'takeaway_negative': 'Overall, longer slides reduce cognitive load.',
   },
@@ -868,6 +884,7 @@ outcome_specs = [
     'label': 'Simplicity rating',
     'y_breaks': [-2, -1, 0, 1, 2],
     'y_labels': ['Strongly disagree', 'Disagree', 'Neither agree nor disagree', 'Agree', 'Strongly agree'],
+    'y_limits': (-2.2, 2.2),
     'takeaway_positive': 'Overall, longer slides are rated as more simple and clean.',
     'takeaway_negative': 'Overall, longer slides are rated as less simple and clean.',
   },
@@ -881,7 +898,8 @@ for spec in outcome_specs:
     spec['column'],
     spec['label'],
     y_breaks=spec['y_breaks'],
-    y_labels=spec['y_labels']
+    y_labels=spec['y_labels'],
+    y_limits=spec['y_limits']
   )
   plot.show()
   display(Markdown("**Main effects table**"))
@@ -898,7 +916,8 @@ for spec in outcome_specs:
     spec['column'],
     spec['label'],
     y_breaks=spec['y_breaks'],
-    y_labels=spec['y_labels']
+    y_labels=spec['y_labels'],
+    y_limits=spec['y_limits']
   )
   trend_plot.show()
   display(Markdown("""
