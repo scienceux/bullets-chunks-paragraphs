@@ -1,0 +1,19 @@
+# See docs at: https://mystmd.org/guide/frontmatter
+version: 1
+project:
+  id: 42fc50d3-a128-436f-aaaf-71f91a76761e
+  title: For text-heavy emailed slides, paragraphs were better for learning.
+  # description:
+  # keywords: []
+  authors:
+    - name: Rieke Schäfer
+    - name: Nolan Haims
+    - name: Sheila B Robinson
+    - name: Mike Morrison
+  github: https://github.com/scienceux/bullets-chunks-paragraphs
+  # To autogenerate a Table of Contents, run "myst init --write-toc"
+site:
+  template: article-theme
+  # options:
+  #   favicon: favicon.ico
+  #   logo: site_logo.png
